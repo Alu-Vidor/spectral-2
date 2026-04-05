@@ -8,6 +8,7 @@ from .fepg_demm import (
     MuntzLegendreBasis,
     SingularPerturbedFractionalProblem,
 )
+from .l1_scheme import L1SchemeResult, L1SchemeSettings, L1SchemeSolver
 from .mittag_leffler import SeyboldHilferMittagLeffler
 
 __all__ = [
@@ -16,6 +17,9 @@ __all__ = [
     "DESemiInfiniteQuadrature",
     "FEPGDEMMSettings",
     "FEPGDEMMSolver",
+    "L1SchemeResult",
+    "L1SchemeSettings",
+    "L1SchemeSolver",
     "MuntzLegendreBasis",
     "SeyboldHilferMittagLeffler",
     "SingularPerturbedFractionalProblem",
