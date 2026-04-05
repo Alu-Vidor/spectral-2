@@ -17,10 +17,5 @@ dist/
 venv/
 env/
 
-# Benchmark/demo generated artifacts
-benchmark_*.csv
-benchmark_*.png
-benchmark_*.md
-
 # Local plots and reports
 *.svg
