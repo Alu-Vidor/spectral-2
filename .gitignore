@@ -19,3 +19,4 @@ env/
 
 # Local plots and reports
 *.svg
+benchmarks/**/results/
