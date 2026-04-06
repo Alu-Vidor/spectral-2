@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import linalg, special
 
+from benchmarks.common import ensure_results_dir
 from spfde.de_quadrature import DEMappedIntervalQuadrature
 from spfde.fepg_demm import MuntzLegendreBasis
 from spfde.mittag_leffler import SeyboldHilferMittagLeffler
@@ -675,12 +676,17 @@ def main() -> None:
     if heaviest_fdm_x is None or heaviest_fdm_solution is None:
         raise RuntimeError("Heaviest FDM solution was not generated.")
 
-    surface_path = Path(f"{prefix}_surface.png")
-    corner_zoom_path = Path(f"{prefix}_corner_zoom.png")
-    boundary_cuts_path = Path(f"{prefix}_boundary_cuts.png")
-    metrics_path = Path(f"{prefix}_metrics.png")
-    csv_path = Path(f"{prefix}_results.csv")
-    report_path = Path(f"{prefix}_report.md")
+    output_dir = ensure_results_dir(__file__)
+    prefix_path = Path(prefix)
+    if not prefix_path.is_absolute():
+        prefix_path = output_dir / prefix_path
+
+    surface_path = Path(f"{prefix_path}_surface.png")
+    corner_zoom_path = Path(f"{prefix_path}_corner_zoom.png")
+    boundary_cuts_path = Path(f"{prefix_path}_boundary_cuts.png")
+    metrics_path = Path(f"{prefix_path}_metrics.png")
+    csv_path = Path(f"{prefix_path}_results.csv")
+    report_path = Path(f"{prefix_path}_report.md")
 
     plot_surface_comparison(best_fepg_x, best_exact_solution, best_fepg_solution, str(surface_path))
     plot_corner_zoom(best_fepg_x, best_exact_solution, best_fepg_solution, epsilon, alpha, str(corner_zoom_path))
@@ -693,12 +699,12 @@ def main() -> None:
     )
 
     print()
-    print(f"Saved 3D surface plot to: {surface_path.name}")
-    print(f"Saved corner zoom plot to: {corner_zoom_path.name}")
-    print(f"Saved boundary cuts plot to: {boundary_cuts_path.name}")
-    print(f"Saved metrics plot to: {metrics_path.name}")
-    print(f"Saved CSV results to: {csv_path.name}")
-    print(f"Saved markdown report to: {report_path.name}")
+    print(f"Saved 3D surface plot to: {surface_path}")
+    print(f"Saved corner zoom plot to: {corner_zoom_path}")
+    print(f"Saved boundary cuts plot to: {boundary_cuts_path}")
+    print(f"Saved metrics plot to: {metrics_path}")
+    print(f"Saved CSV results to: {csv_path}")
+    print(f"Saved markdown report to: {report_path}")
 
 
 if __name__ == "__main__":
