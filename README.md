@@ -50,4 +50,9 @@ py -3 -m benchmarks.two_dimensional.benchmark_2d
 
 Результаты каждого сценария складываются в свою папку `results/` внутри `benchmarks/...`.
 
+1D-бенчмарки сейчас считают две задачи:
+
+- каноническую задачу из статьи
+- дополнительную objective manufactured-задачу с точным решением `u(x)=E_alpha(-x^alpha / epsilon) + x^2`
+
 Подробности по benchmark-структуре есть в [benchmarks/README.md](/c:/Users/danii/Desktop/Diss/spectral-2/benchmarks/README.md).

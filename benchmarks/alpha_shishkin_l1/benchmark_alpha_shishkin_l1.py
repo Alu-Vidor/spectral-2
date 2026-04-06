@@ -1,10 +1,9 @@
-"""Alpha-Shishkin-L1-only benchmark on the canonical problem from the article."""
+"""Alpha-Shishkin-L1 benchmark suite on shared 1D test problems."""
 
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,12 +11,12 @@ import numpy as np
 from alpha_shishkin_l1 import AlphaShishkinL1Settings, AlphaShishkinL1Solver
 from benchmarks.common import (
     ArticleTestProblemConfig,
-    article_exact_solution,
+    BenchmarkProblemDefinition,
+    default_1d_benchmark_problems,
     ensure_results_dir,
     format_float,
     markdown_table,
     save_csv,
-    build_article_problem,
 )
 from spfde import L1SchemeSettings, L1SchemeSolver, SeyboldHilferMittagLeffler
 
@@ -25,6 +24,7 @@ from spfde import L1SchemeSettings, L1SchemeSolver, SeyboldHilferMittagLeffler
 @dataclass(slots=True)
 class AlphaShishkinBenchmarkConfig:
     problem: ArticleTestProblemConfig
+    problems: list[BenchmarkProblemDefinition]
     mesh_refinement_parameter: float
     epsilons: list[float]
     interval_sizes: list[int]
@@ -34,6 +34,7 @@ class AlphaShishkinBenchmarkConfig:
 
 @dataclass(slots=True)
 class AlphaShishkinRow:
+    problem_key: str
     epsilon: float
     n_intervals: int
     max_error: float
@@ -42,12 +43,13 @@ class AlphaShishkinRow:
 
 
 def run_case(
+    benchmark_problem: BenchmarkProblemDefinition,
     epsilon: float,
     n_intervals: int,
     config: AlphaShishkinBenchmarkConfig,
     ml: SeyboldHilferMittagLeffler,
 ) -> tuple[AlphaShishkinRow, np.ndarray, np.ndarray, np.ndarray]:
-    problem = build_article_problem(epsilon, config.problem)
+    problem = benchmark_problem.build_problem(epsilon, config.problem)
     solver = AlphaShishkinL1Solver(
         problem,
         AlphaShishkinL1Settings(
@@ -63,9 +65,10 @@ def run_case(
 
     x_dense = np.linspace(0.0, config.problem.T, config.dense_points)
     u_num = np.interp(x_dense, result.mesh.nodes, result.solution)
-    u_exact = article_exact_solution(x_dense, epsilon, config.problem, ml)
+    u_exact = benchmark_problem.exact_solution(x_dense, epsilon, config.problem, ml)
 
     row = AlphaShishkinRow(
+        problem_key=benchmark_problem.key,
         epsilon=epsilon,
         n_intervals=n_intervals,
         max_error=float(np.max(np.abs(u_num - u_exact))),
@@ -76,12 +79,13 @@ def run_case(
 
 
 def run_uniform_case(
+    benchmark_problem: BenchmarkProblemDefinition,
     epsilon: float,
     n_intervals: int,
     config: AlphaShishkinBenchmarkConfig,
     ml: SeyboldHilferMittagLeffler,
 ) -> tuple[AlphaShishkinRow, np.ndarray, np.ndarray, np.ndarray]:
-    problem = build_article_problem(epsilon, config.problem)
+    problem = benchmark_problem.build_problem(epsilon, config.problem)
     solver = L1SchemeSolver(problem, L1SchemeSettings(n_steps=n_intervals))
 
     start = time.perf_counter()
@@ -90,9 +94,10 @@ def run_uniform_case(
 
     x_dense = np.linspace(0.0, config.problem.T, config.dense_points)
     u_num = np.interp(x_dense, result.grid, result.solution)
-    u_exact = article_exact_solution(x_dense, epsilon, config.problem, ml)
+    u_exact = benchmark_problem.exact_solution(x_dense, epsilon, config.problem, ml)
 
     row = AlphaShishkinRow(
+        problem_key=benchmark_problem.key,
         epsilon=epsilon,
         n_intervals=n_intervals,
         max_error=float(np.max(np.abs(u_num - u_exact))),
@@ -139,6 +144,7 @@ def build_summary_table(
 
 
 def plot_convergence(
+    benchmark_problem: BenchmarkProblemDefinition,
     alpha_shishkin_rows: list[AlphaShishkinRow],
     uniform_rows: list[AlphaShishkinRow],
     config: AlphaShishkinBenchmarkConfig,
@@ -184,13 +190,13 @@ def plot_convergence(
             label=f"Uniform eps={epsilon:.0e}",
         )
 
-    axes[0].set_title("Error vs interval count")
+    axes[0].set_title(f"{benchmark_problem.title}: error vs interval count")
     axes[0].set_xlabel("n_intervals")
     axes[0].set_ylabel("max error on dense grid")
     axes[0].grid(True, which="both", alpha=0.3)
     axes[0].legend(fontsize=7)
 
-    axes[1].set_title("Runtime vs interval count")
+    axes[1].set_title(f"{benchmark_problem.title}: runtime vs interval count")
     axes[1].set_xlabel("n_intervals")
     axes[1].set_ylabel("seconds")
     axes[1].grid(True, which="both", alpha=0.3)
@@ -202,17 +208,20 @@ def plot_convergence(
 
 
 def plot_profile(
+    benchmark_problem: BenchmarkProblemDefinition,
     config: AlphaShishkinBenchmarkConfig,
     output_path: Path,
 ) -> None:
     ml = SeyboldHilferMittagLeffler(alpha=config.problem.alpha)
     _, x_dense, u_alpha_shishkin, u_exact = run_case(
+        benchmark_problem,
         config.profile_epsilon,
         max(config.interval_sizes),
         config,
         ml,
     )
     _, _, u_uniform, _ = run_uniform_case(
+        benchmark_problem,
         config.profile_epsilon,
         max(config.interval_sizes),
         config,
@@ -226,7 +235,7 @@ def plot_profile(
     ax.set_xlabel("x")
     ax.set_ylabel("u(x)")
     ax.set_title(
-        f"Alpha-Shishkin L1 profile: epsilon={config.profile_epsilon:.0e}, "
+        f"{benchmark_problem.title}: epsilon={config.profile_epsilon:.0e}, "
         f"N={max(config.interval_sizes)}"
     )
     ax.grid(True, alpha=0.3)
@@ -238,6 +247,7 @@ def plot_profile(
 
 def write_report(
     config: AlphaShishkinBenchmarkConfig,
+    benchmark_problem: BenchmarkProblemDefinition,
     alpha_shishkin_rows: list[AlphaShishkinRow],
     uniform_rows: list[AlphaShishkinRow],
     alpha_csv_path: Path,
@@ -274,7 +284,7 @@ def write_report(
 
     report = "\n".join(
         [
-            "# Alpha-Shishkin L1 Benchmark",
+            f"# Alpha-Shishkin L1 Benchmark: {benchmark_problem.title}",
             "",
             "## Configuration",
             "",
@@ -284,9 +294,7 @@ def write_report(
             f"- `M = {config.mesh_refinement_parameter}`",
             f"- `dense_points = {config.dense_points}`",
             "",
-            "This benchmark uses the same canonical constant-coefficient problem as the spectral benchmark:",
-            r"`epsilon D_C^alpha u(x) + u(x) = 0`, `u(0) = 1`, with exact solution",
-            r"`u(x) = E_alpha(-x^alpha / epsilon)`.",
+            benchmark_problem.description,
             "",
             "## Alpha-Shishkin Error Table",
             "",
@@ -327,9 +335,15 @@ def write_report(
     report_path.write_text(report + "\n", encoding="utf-8")
 
 
+def slug(prefix: str, benchmark_problem: BenchmarkProblemDefinition) -> str:
+    return f"{benchmark_problem.key}_{prefix}"
+
+
 def main() -> None:
+    problem_config = ArticleTestProblemConfig()
     config = AlphaShishkinBenchmarkConfig(
-        problem=ArticleTestProblemConfig(),
+        problem=problem_config,
+        problems=default_1d_benchmark_problems(problem_config),
         mesh_refinement_parameter=4.0,
         epsilons=[1.0e-4, 1.0e-2, 1.0e-1, 4.0e-1, 8.0e-1],
         interval_sizes=[16, 32, 64, 128, 256, 512],
@@ -337,53 +351,56 @@ def main() -> None:
         profile_epsilon=1.0e-2,
     )
     output_dir = ensure_results_dir(__file__)
-    alpha_shishkin_rows: list[AlphaShishkinRow] = []
-    uniform_rows: list[AlphaShishkinRow] = []
 
-    print("Running Alpha-Shishkin L1 benchmark")
+    print("Running Alpha-Shishkin L1 benchmark suite")
     print(f"epsilons = {config.epsilons}")
     print(f"interval sizes = {config.interval_sizes}")
     print()
 
-    for epsilon in config.epsilons:
-        ml = SeyboldHilferMittagLeffler(alpha=config.problem.alpha)
-        for n_intervals in config.interval_sizes:
-            alpha_row, _, _, _ = run_case(epsilon, n_intervals, config, ml)
-            uniform_row, _, _, _ = run_uniform_case(epsilon, n_intervals, config, ml)
-            alpha_shishkin_rows.append(alpha_row)
-            uniform_rows.append(uniform_row)
-            print(
-                f"epsilon={epsilon:.1e}, N={n_intervals:>3}: "
-                f"Alpha-Shishkin={alpha_row.max_error:.5e}, Uniform={uniform_row.max_error:.5e}"
-            )
+    for benchmark_problem in config.problems:
+        alpha_shishkin_rows: list[AlphaShishkinRow] = []
+        uniform_rows: list[AlphaShishkinRow] = []
+        print(f"[{benchmark_problem.key}] {benchmark_problem.title}")
+        for epsilon in config.epsilons:
+            ml = SeyboldHilferMittagLeffler(alpha=config.problem.alpha)
+            for n_intervals in config.interval_sizes:
+                alpha_row, _, _, _ = run_case(benchmark_problem, epsilon, n_intervals, config, ml)
+                uniform_row, _, _, _ = run_uniform_case(benchmark_problem, epsilon, n_intervals, config, ml)
+                alpha_shishkin_rows.append(alpha_row)
+                uniform_rows.append(uniform_row)
+                print(
+                    f"epsilon={epsilon:.1e}, N={n_intervals:>3}: "
+                    f"Alpha-Shishkin={alpha_row.max_error:.5e}, Uniform={uniform_row.max_error:.5e}"
+                )
 
-    alpha_csv_path = output_dir / "alpha_shishkin_l1_sweep.csv"
-    uniform_csv_path = output_dir / "uniform_l1_reference_sweep.csv"
-    convergence_path = output_dir / "alpha_shishkin_l1_convergence.png"
-    profile_path = output_dir / "alpha_shishkin_l1_profile.png"
-    report_path = output_dir / "alpha_shishkin_l1_report.md"
+        alpha_csv_path = output_dir / f"{slug('alpha_shishkin_l1_sweep', benchmark_problem)}.csv"
+        uniform_csv_path = output_dir / f"{slug('uniform_l1_reference_sweep', benchmark_problem)}.csv"
+        convergence_path = output_dir / f"{slug('alpha_shishkin_l1_convergence', benchmark_problem)}.png"
+        profile_path = output_dir / f"{slug('alpha_shishkin_l1_profile', benchmark_problem)}.png"
+        report_path = output_dir / f"{slug('alpha_shishkin_l1_report', benchmark_problem)}.md"
 
-    save_rows(alpha_shishkin_rows, alpha_csv_path)
-    save_rows(uniform_rows, uniform_csv_path)
-    plot_convergence(alpha_shishkin_rows, uniform_rows, config, convergence_path)
-    plot_profile(config, profile_path)
-    write_report(
-        config,
-        alpha_shishkin_rows,
-        uniform_rows,
-        alpha_csv_path,
-        uniform_csv_path,
-        convergence_path,
-        profile_path,
-        report_path,
-    )
+        save_rows(alpha_shishkin_rows, alpha_csv_path)
+        save_rows(uniform_rows, uniform_csv_path)
+        plot_convergence(benchmark_problem, alpha_shishkin_rows, uniform_rows, config, convergence_path)
+        plot_profile(benchmark_problem, config, profile_path)
+        write_report(
+            config,
+            benchmark_problem,
+            alpha_shishkin_rows,
+            uniform_rows,
+            alpha_csv_path,
+            uniform_csv_path,
+            convergence_path,
+            profile_path,
+            report_path,
+        )
 
-    print()
-    print(f"Saved report to: {report_path}")
-    print(f"Saved Alpha-Shishkin CSV to: {alpha_csv_path}")
-    print(f"Saved uniform CSV to: {uniform_csv_path}")
-    print(f"Saved convergence plot to: {convergence_path}")
-    print(f"Saved profile plot to: {profile_path}")
+        print(f"Saved report to: {report_path}")
+        print(f"Saved Alpha-Shishkin CSV to: {alpha_csv_path}")
+        print(f"Saved uniform CSV to: {uniform_csv_path}")
+        print(f"Saved convergence plot to: {convergence_path}")
+        print(f"Saved profile plot to: {profile_path}")
+        print()
 
 
 if __name__ == "__main__":

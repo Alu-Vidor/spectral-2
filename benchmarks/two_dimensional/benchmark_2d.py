@@ -324,15 +324,19 @@ def plot_surface_comparison(
     x: np.ndarray,
     exact_grid: np.ndarray,
     fepg_grid: np.ndarray,
+    x_fdm: np.ndarray,
+    fdm_grid: np.ndarray,
     output_path: str,
 ) -> None:
     x_mesh, y_mesh = np.meshgrid(x, x, indexing="ij")
-    z_min = float(min(np.min(exact_grid), np.min(fepg_grid)))
-    z_max = float(max(np.max(exact_grid), np.max(fepg_grid)))
+    x_fdm_mesh, y_fdm_mesh = np.meshgrid(x_fdm, x_fdm, indexing="ij")
+    z_min = float(min(np.min(exact_grid), np.min(fepg_grid), np.min(fdm_grid)))
+    z_max = float(max(np.max(exact_grid), np.max(fepg_grid), np.max(fdm_grid)))
 
-    fig = plt.figure(figsize=(14, 6))
-    ax_exact = fig.add_subplot(1, 2, 1, projection="3d")
-    ax_fepg = fig.add_subplot(1, 2, 2, projection="3d")
+    fig = plt.figure(figsize=(20, 6))
+    ax_exact = fig.add_subplot(1, 3, 1, projection="3d")
+    ax_fepg = fig.add_subplot(1, 3, 2, projection="3d")
+    ax_fdm = fig.add_subplot(1, 3, 3, projection="3d")
 
     surf_exact = ax_exact.plot_surface(
         x_mesh,
@@ -366,10 +370,26 @@ def plot_surface_comparison(
     ax_fepg.set_zlim(z_min, z_max)
     ax_fepg.view_init(elev=28, azim=-135)
 
-    cbar = fig.colorbar(surf_fepg, ax=[ax_exact, ax_fepg], shrink=0.75, pad=0.08)
+    surf_fdm = ax_fdm.plot_surface(
+        x_fdm_mesh,
+        y_fdm_mesh,
+        fdm_grid,
+        cmap="viridis",
+        linewidth=0.0,
+        antialiased=True,
+    )
+    ax_fdm.contour(x_fdm_mesh, y_fdm_mesh, fdm_grid, zdir="z", offset=z_min, cmap="viridis", levels=12)
+    ax_fdm.set_title("L1 FDM Solution")
+    ax_fdm.set_xlabel("x")
+    ax_fdm.set_ylabel("y")
+    ax_fdm.set_zlabel("u(x, y)")
+    ax_fdm.set_zlim(z_min, z_max)
+    ax_fdm.view_init(elev=28, azim=-135)
+
+    cbar = fig.colorbar(surf_fdm, ax=[ax_exact, ax_fepg, ax_fdm], shrink=0.75, pad=0.04)
     cbar.set_label("u(x, y)")
-    fig.suptitle("2D SPFDE benchmark: exact vs FEPG-DEMM surface", fontsize=14)
-    fig.subplots_adjust(left=0.02, right=0.92, bottom=0.04, top=0.90, wspace=0.10)
+    fig.suptitle("2D SPFDE benchmark: exact, FEPG-DEMM, and L1 FDM surfaces", fontsize=14)
+    fig.subplots_adjust(left=0.02, right=0.94, bottom=0.04, top=0.90, wspace=0.10)
     fig.savefig(output_path, dpi=180)
     plt.close(fig)
 
@@ -688,7 +708,14 @@ def main() -> None:
     csv_path = Path(f"{prefix_path}_results.csv")
     report_path = Path(f"{prefix_path}_report.md")
 
-    plot_surface_comparison(best_fepg_x, best_exact_solution, best_fepg_solution, str(surface_path))
+    plot_surface_comparison(
+        best_fepg_x,
+        best_exact_solution,
+        best_fepg_solution,
+        heaviest_fdm_x,
+        heaviest_fdm_solution,
+        str(surface_path),
+    )
     plot_corner_zoom(best_fepg_x, best_exact_solution, best_fepg_solution, epsilon, alpha, str(corner_zoom_path))
     plot_boundary_cuts(best_fepg_x, best_exact_solution, best_fepg_solution, heaviest_fdm_x, heaviest_fdm_solution, str(boundary_cuts_path))
     plot_metrics(results, str(metrics_path))

@@ -1,22 +1,21 @@
-"""Spectral-only benchmark on the canonical problem from the article."""
+"""Spectral benchmark suite on shared 1D test problems."""
 
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 from benchmarks.common import (
     ArticleTestProblemConfig,
-    article_exact_solution,
+    BenchmarkProblemDefinition,
+    default_1d_benchmark_problems,
     ensure_results_dir,
     format_float,
     markdown_table,
     save_csv,
-    build_article_problem,
 )
 from spfde import (
     FEPGDEMMSettings,
@@ -28,6 +27,7 @@ from spfde import (
 @dataclass(slots=True)
 class SpectralBenchmarkConfig:
     problem: ArticleTestProblemConfig
+    problems: list[BenchmarkProblemDefinition]
     epsilons: list[float]
     basis_sizes: list[int]
     dense_points: int
@@ -36,6 +36,7 @@ class SpectralBenchmarkConfig:
 
 @dataclass(slots=True)
 class SpectralRow:
+    problem_key: str
     epsilon: float
     n_basis: int
     max_error: float
@@ -46,12 +47,13 @@ class SpectralRow:
 
 
 def run_case(
+    benchmark_problem: BenchmarkProblemDefinition,
     epsilon: float,
     n_basis: int,
     config: SpectralBenchmarkConfig,
     ml: SeyboldHilferMittagLeffler,
 ) -> tuple[SpectralRow, np.ndarray, np.ndarray, np.ndarray]:
-    problem = build_article_problem(epsilon, config.problem)
+    problem = benchmark_problem.build_problem(epsilon, config.problem)
     solver = FEPGDEMMSolver(
         problem=problem,
         settings=FEPGDEMMSettings(
@@ -70,9 +72,10 @@ def run_case(
 
     x_dense = np.linspace(0.0, config.problem.T, config.dense_points)
     u_num = solver.evaluate_solution(x_dense, result.coefficients)
-    u_exact = article_exact_solution(x_dense, epsilon, config.problem, ml)
+    u_exact = benchmark_problem.exact_solution(x_dense, epsilon, config.problem, ml)
 
     row = SpectralRow(
+        problem_key=benchmark_problem.key,
         epsilon=epsilon,
         n_basis=n_basis,
         max_error=float(np.max(np.abs(u_num - u_exact))),
@@ -127,6 +130,7 @@ def build_summary_table(rows: list[SpectralRow], epsilons: list[float], basis_si
 
 
 def plot_convergence(
+    benchmark_problem: BenchmarkProblemDefinition,
     rows: list[SpectralRow],
     config: SpectralBenchmarkConfig,
     output_path: Path,
@@ -142,13 +146,13 @@ def plot_convergence(
         axes[0].semilogy(basis, plotted_errors, "o-", linewidth=2.0, label=f"eps={epsilon:.0e}")
         axes[1].loglog(basis, [row.cpu_time for row in subset], "o-", linewidth=2.0, label=f"eps={epsilon:.0e}")
 
-    axes[0].set_title("Spectral error vs basis size")
+    axes[0].set_title(f"{benchmark_problem.title}: spectral error vs basis size")
     axes[0].set_xlabel("n_basis")
     axes[0].set_ylabel("max error on dense grid")
     axes[0].grid(True, which="both", alpha=0.3)
     axes[0].legend()
 
-    axes[1].set_title("Spectral runtime vs basis size")
+    axes[1].set_title(f"{benchmark_problem.title}: spectral runtime vs basis size")
     axes[1].set_xlabel("n_basis")
     axes[1].set_ylabel("seconds")
     axes[1].grid(True, which="both", alpha=0.3)
@@ -160,11 +164,13 @@ def plot_convergence(
 
 
 def plot_profile(
+    benchmark_problem: BenchmarkProblemDefinition,
     config: SpectralBenchmarkConfig,
     output_path: Path,
 ) -> None:
     ml = SeyboldHilferMittagLeffler(alpha=config.problem.alpha)
     _, x_dense, u_num, u_exact = run_case(
+        benchmark_problem,
         config.profile_epsilon,
         max(config.basis_sizes),
         config,
@@ -177,7 +183,8 @@ def plot_profile(
     ax.set_xlabel("x")
     ax.set_ylabel("u(x)")
     ax.set_title(
-        f"Spectral profile: epsilon={config.profile_epsilon:.0e}, n_basis={max(config.basis_sizes)}"
+        f"{benchmark_problem.title}: epsilon={config.profile_epsilon:.0e}, "
+        f"n_basis={max(config.basis_sizes)}"
     )
     ax.grid(True, alpha=0.3)
     ax.legend()
@@ -188,6 +195,7 @@ def plot_profile(
 
 def write_report(
     config: SpectralBenchmarkConfig,
+    benchmark_problem: BenchmarkProblemDefinition,
     rows: list[SpectralRow],
     csv_path: Path,
     convergence_path: Path,
@@ -210,7 +218,7 @@ def write_report(
 
     report = "\n".join(
         [
-            "# Spectral Benchmark",
+            f"# Spectral Benchmark: {benchmark_problem.title}",
             "",
             "## Configuration",
             "",
@@ -219,8 +227,7 @@ def write_report(
             f"- `basis sizes = {config.basis_sizes}`",
             f"- `dense_points = {config.dense_points}`",
             "",
-            "On this canonical constant-coefficient problem the singular corrector used by the spectral solver",
-            "matches the exact boundary-layer profile, so the observed error is at machine precision.",
+            benchmark_problem.description,
             "",
             "## Error Table",
             "",
@@ -248,47 +255,55 @@ def write_report(
     report_path.write_text(report + "\n", encoding="utf-8")
 
 
+def slug(prefix: str, benchmark_problem: BenchmarkProblemDefinition) -> str:
+    return f"{benchmark_problem.key}_{prefix}"
+
+
 def main() -> None:
+    problem_config = ArticleTestProblemConfig()
     config = SpectralBenchmarkConfig(
-        problem=ArticleTestProblemConfig(),
+        problem=problem_config,
+        problems=default_1d_benchmark_problems(problem_config),
         epsilons=[1.0e-4, 1.0e-2, 1.0e-1, 4.0e-1, 8.0e-1],
         basis_sizes=[2, 4, 6, 8, 12, 16, 24, 32],
         dense_points=4000,
         profile_epsilon=1.0e-2,
     )
     output_dir = ensure_results_dir(__file__)
-    rows: list[SpectralRow] = []
 
-    print("Running spectral benchmark")
+    print("Running spectral benchmark suite")
     print(f"epsilons = {config.epsilons}")
     print(f"basis sizes = {config.basis_sizes}")
     print()
 
-    for epsilon in config.epsilons:
-        ml = SeyboldHilferMittagLeffler(alpha=config.problem.alpha)
-        for n_basis in config.basis_sizes:
-            row, _, _, _ = run_case(epsilon, n_basis, config, ml)
-            rows.append(row)
-            print(
-                f"epsilon={epsilon:.1e}, n_basis={n_basis:>2}: "
-                f"error={row.max_error:.5e}, cond={row.condition_number:.5e}"
-            )
+    for benchmark_problem in config.problems:
+        rows: list[SpectralRow] = []
+        print(f"[{benchmark_problem.key}] {benchmark_problem.title}")
+        for epsilon in config.epsilons:
+            ml = SeyboldHilferMittagLeffler(alpha=config.problem.alpha)
+            for n_basis in config.basis_sizes:
+                row, _, _, _ = run_case(benchmark_problem, epsilon, n_basis, config, ml)
+                rows.append(row)
+                print(
+                    f"epsilon={epsilon:.1e}, n_basis={n_basis:>2}: "
+                    f"error={row.max_error:.5e}, cond={row.condition_number:.5e}"
+                )
 
-    csv_path = output_dir / "spectral_sweep.csv"
-    convergence_path = output_dir / "spectral_convergence.png"
-    profile_path = output_dir / "spectral_profile.png"
-    report_path = output_dir / "spectral_report.md"
+        csv_path = output_dir / f"{slug('spectral_sweep', benchmark_problem)}.csv"
+        convergence_path = output_dir / f"{slug('spectral_convergence', benchmark_problem)}.png"
+        profile_path = output_dir / f"{slug('spectral_profile', benchmark_problem)}.png"
+        report_path = output_dir / f"{slug('spectral_report', benchmark_problem)}.md"
 
-    save_rows(rows, csv_path)
-    plot_convergence(rows, config, convergence_path)
-    plot_profile(config, profile_path)
-    write_report(config, rows, csv_path, convergence_path, profile_path, report_path)
+        save_rows(rows, csv_path)
+        plot_convergence(benchmark_problem, rows, config, convergence_path)
+        plot_profile(benchmark_problem, config, profile_path)
+        write_report(config, benchmark_problem, rows, csv_path, convergence_path, profile_path, report_path)
 
-    print()
-    print(f"Saved report to: {report_path}")
-    print(f"Saved CSV to: {csv_path}")
-    print(f"Saved convergence plot to: {convergence_path}")
-    print(f"Saved profile plot to: {profile_path}")
+        print(f"Saved report to: {report_path}")
+        print(f"Saved CSV to: {csv_path}")
+        print(f"Saved convergence plot to: {convergence_path}")
+        print(f"Saved profile plot to: {profile_path}")
+        print()
 
 
 if __name__ == "__main__":
