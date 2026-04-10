@@ -52,6 +52,7 @@ py -3 demo_inverse_aeml_vpinn.py
 py -3 -m benchmarks.spectral.benchmark_spectral
 py -3 -m benchmarks.alpha_shishkin_l1.benchmark_alpha_shishkin_l1
 py -3 -m benchmarks.aeml_vpinn.benchmark_aeml_vpinn
+py -3 -m benchmarks.inverse_aeml_vpinn.benchmark_inverse_aeml_vpinn
 py -3 -m benchmarks.two_dimensional.benchmark_2d
 ```
 

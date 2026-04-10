@@ -5,6 +5,7 @@ This directory is split by method family:
 - `spectral/` contains benchmarks only for the spectral `FEPG-DEMM` solver.
 - `alpha_shishkin_l1/` contains benchmarks only for the proposed `Alpha-Shishkin L1` method, together with the uniform `L1` reference.
 - `aeml_vpinn/` contains benchmarks for the asymptotically enriched variational `AEML-vPINN` method, together with the uniform `L1` reference.
+- `inverse_aeml_vpinn/` contains benchmarks for the inverse `AEML-vPINN` tasks: parameter identification and reaction-field inversion.
 - `two_dimensional/` contains the tensor-product 2D benchmark.
 
 All 1D benchmark suites run the same two problems:
@@ -18,6 +19,7 @@ Run them from the repository root:
 python -m benchmarks.spectral.benchmark_spectral
 python -m benchmarks.alpha_shishkin_l1.benchmark_alpha_shishkin_l1
 python -m benchmarks.aeml_vpinn.benchmark_aeml_vpinn
+python -m benchmarks.inverse_aeml_vpinn.benchmark_inverse_aeml_vpinn
 python -m benchmarks.two_dimensional.benchmark_2d
 ```
 
