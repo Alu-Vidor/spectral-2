@@ -18,5 +18,5 @@ venv/
 env/
 
 # Local plots and reports
-*.svg
-benchmarks/**/results/
+# *.svg
+# benchmarks/**/results/
