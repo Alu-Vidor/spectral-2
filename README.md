@@ -19,6 +19,7 @@
 - [demo.py](/c:/Users/danii/Desktop/Diss/spectral-2/demo.py) — короткий запуск спектрального метода
 - [demo_alpha_shishkin_l1.py](/c:/Users/danii/Desktop/Diss/spectral-2/demo_alpha_shishkin_l1.py) — короткий запуск метода `Alpha-Shishkin L1`
 - [demo_aeml_vpinn.py](/c:/Users/danii/Desktop/Diss/spectral-2/demo_aeml_vpinn.py) — короткий запуск метода `AEML-vPINN`
+- [demo_inverse_aeml_vpinn.py](/c:/Users/danii/Desktop/Diss/spectral-2/demo_inverse_aeml_vpinn.py) — демонстрация обратных задач для `AEML-vPINN`
 
 ## Зависимости
 
@@ -40,6 +41,7 @@
 py -3 demo.py
 py -3 demo_alpha_shishkin_l1.py
 py -3 demo_aeml_vpinn.py
+py -3 demo_inverse_aeml_vpinn.py
 ```
 
 ## Бенчмарки

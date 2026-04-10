@@ -2,6 +2,11 @@
 
 from .aeml_vpinn import (
     AEMLVPINNAdaptiveQuadrature,
+    AEMLVPINNObservationData,
+    AEMLVPINNParameterInverseResult,
+    AEMLVPINNParameterInverseSettings,
+    AEMLVPINNReactionInverseResult,
+    AEMLVPINNReactionInverseSettings,
     AEMLVPINNResult,
     AEMLVPINNSettings,
     AEMLVPINNSolver,
@@ -9,6 +14,11 @@ from .aeml_vpinn import (
 
 __all__ = [
     "AEMLVPINNAdaptiveQuadrature",
+    "AEMLVPINNObservationData",
+    "AEMLVPINNParameterInverseResult",
+    "AEMLVPINNParameterInverseSettings",
+    "AEMLVPINNReactionInverseResult",
+    "AEMLVPINNReactionInverseSettings",
     "AEMLVPINNResult",
     "AEMLVPINNSettings",
     "AEMLVPINNSolver",
